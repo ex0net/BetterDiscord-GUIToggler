@@ -2,7 +2,7 @@
  * @name GUIToggler
  * @author ㄱㅇㅇ
  * @authorId 1006027073103609887
- * @version 1.0.4
+ * @version 1.0.5
  * @description 🎛️ 채팅 자동 반응/포맷 설정 GUI를 Discord 안에서 직접 조절할 수 있게 해줍니다.
  * @invite rfaznuJj
  * @donate https://buymeacoffee.com/ex0net
@@ -29,7 +29,7 @@ module.exports = class AutoReactFormatter {
           return;
       }
       // 메시지 전송 함수 오버라이드
-      const originalSendMessage = MessageActions.sendMessage;
+      this.originalSendMessage = MessageActions.sendMessage;
 
       MessageActions.sendMessage = (channelId, content) => {
         // 메시지가 전송되기 전에 실행할 작업
@@ -39,7 +39,7 @@ module.exports = class AutoReactFormatter {
         const message = originalSendMessage(channelId, content);
         if (this.settings["autoReact"]) {
           // 메시지가 성공적으로 전송되면 반응 추가
-          message.then((msg) => {
+          Promise.resolve(message).then((msg) => {
               // 예시로 기본 반응 이모지 "👍"을 추가
               this.addReaction(msg.channel_id, msg.id, this.settings.reactionEmoji);
           });
