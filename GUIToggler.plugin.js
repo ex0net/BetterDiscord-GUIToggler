@@ -1,15 +1,13 @@
-// BetterDiscord 플러그인 구조로 포팅된 자동 리액션 및 포맷 플러그인
-
 /**
  * @name GUIToggler
  * @author ㄱㅇㅇ
  * @authorId 1006027073103609887
- * @version 1.0.0
+ * @version 1.0.4
  * @description 🎛️ 채팅 자동 반응/포맷 설정 GUI를 Discord 안에서 직접 조절할 수 있게 해줍니다.
  * @invite rfaznuJj
  * @donate https://buymeacoffee.com/ex0net
  * @patreon https://patreon.com/ex0net
- * @website https://ex0.dev/
+ * @website https://github.com/ex0net/BetterDiscord-GUIToggler
  * @source https://github.com/ex0net/BetterDiscord-GUIToggler
  * @updateUrl https://raw.githubusercontent.com/ex0net/BetterDiscord-GUIToggler/main/GUIToggler.plugin.js
  */
@@ -25,13 +23,49 @@ module.exports = class AutoReactFormatter {
       };
   
       this.injectGUI();
-      this.observeMessages();
+      const { MessageActions } = BdApi;
+      if (!MessageActions) {
+          console.error("MessageActions is undefined. Make sure the plugin API is loaded correctly.");
+          return;
+      }
+      // 메시지 전송 함수 오버라이드
+      const originalSendMessage = MessageActions.sendMessage;
+
+      MessageActions.sendMessage = (channelId, content) => {
+        // 메시지가 전송되기 전에 실행할 작업
+        console.log("Message to send:", content);
+
+        // 메시지 전송
+        const message = originalSendMessage(channelId, content);
+        if (this.settings["autoReact"]) {
+          // 메시지가 성공적으로 전송되면 반응 추가
+          message.then((msg) => {
+              // 예시로 기본 반응 이모지 "👍"을 추가
+              this.addReaction(msg.channel_id, msg.id, this.settings.reactionEmoji);
+          });
+        }
+
+        return message;
+      };
     }
   
     stop() {
       if (this.observer) this.observer.disconnect();
       const panel = document.getElementById("auto-react-gui");
       if (panel) panel.remove();
+      const { MessageActions } = BdApi;
+      // 플러그인이 종료될 때 원래의 sendMessage 함수로 되돌리기
+      MessageActions.sendMessage = this.originalSendMessage;
+    }
+    addReaction(channelId, messageId, emoji) {
+      const { MessageActions } = BdApi;
+      MessageActions.addReaction(channelId, messageId, emoji)
+      .then(() => {
+          console.log(`Reaction "${emoji}" added to message ${messageId}`);
+      })
+      .catch((err) => {
+          console.error("Failed to add reaction:", err);
+      });
     }
   
     saveSettings() {
@@ -93,46 +127,6 @@ module.exports = class AutoReactFormatter {
       gui.appendChild(emojiLabel);
   
       document.body.appendChild(gui);
-    }
-  
-    observeMessages() {
-      this.observer = new MutationObserver((mutations) => {
-        mutations.forEach((m) => {
-          m.addedNodes.forEach((n) => {
-            if (!n.querySelector) return;
-  
-            const msg = n.querySelector("[data-list-item-id^='chat-messages']");
-            if (!msg) return;
-  
-            const username = msg.querySelector("h3 span span")?.textContent || "";
-            const isMine = username.includes("(You)");
-  
-            if (isMine && this.settings.autoReact) {
-              const content = msg.querySelector(".markup-2BOw-j")?.textContent || "";
-              const isVote = content.toLowerCase().includes("vote:") || content.includes("투표:");
-  
-              const emojis = isVote ? ["👍", "👎"] : [this.settings.reactionEmoji];
-  
-              emojis.forEach((emoji) => {
-                const reactBtn = msg.querySelector("[aria-label='Add Reaction']");
-                if (reactBtn) {
-                  reactBtn.click();
-                  setTimeout(() => {
-                    const picker = document.querySelector("[role='dialog']");
-                    const emojiBtn = Array.from(picker?.querySelectorAll("div[role='gridcell']") || []).find((btn) =>
-                      btn.innerText.includes(emoji)
-                    );
-                    emojiBtn?.click();
-                  }, 300);
-                }
-              });
-            }
-          });
-        });
-      });
-  
-      const chat = document.querySelector('[class*="scrollerInner"]');
-      if (chat) this.observer.observe(chat, { childList: true, subtree: true });
     }
   };
   
